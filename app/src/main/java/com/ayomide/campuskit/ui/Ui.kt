@@ -7,6 +7,10 @@ import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.RippleDrawable
+import android.graphics.drawable.LayerDrawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.ClipDrawable
 import android.text.InputType
 import android.util.TypedValue
 import android.view.Gravity
@@ -16,6 +20,7 @@ import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
@@ -43,8 +48,26 @@ fun <T : View> T.marginTop(px: Int): T = apply {
     layoutParams = lp
 }
 
+/** Shape + colour helpers for the Material 3-style look. */
+fun Context.rounded(colorRes: Int, radiusDp: Int): GradientDrawable = GradientDrawable().apply {
+    shape = GradientDrawable.RECTANGLE
+    cornerRadius = dp(radiusDp).toFloat()
+    setColor(getColor(colorRes))
+}
+
+/** Wraps [content] in a ripple whose mask matches its rounded shape. */
+fun Context.ripple(content: Drawable?, radiusDp: Int): RippleDrawable {
+    val mask = GradientDrawable().apply { cornerRadius = dp(radiusDp).toFloat(); setColor(0xFFFFFFFF.toInt()) }
+    return RippleDrawable(ColorStateList.valueOf(0x22000000), content, mask)
+}
+
 /** Small builder for the programmatic, framework-only UI. */
 class Ui(val ctx: Context) {
+
+    companion object {
+        const val CARD_RADIUS = 24
+        val MEDIUM: Typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    }
 
     fun color(id: Int) = ctx.getColor(id)
 
@@ -59,22 +82,18 @@ class Ui(val ctx: Context) {
         layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
     }
 
-    private fun selectable(): Drawable? {
-        val a = ctx.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground))
-        val d = a.getDrawable(0)
-        a.recycle()
-        return d
-    }
+    /** Filled tonal card (no outline), 24dp corners. */
+    fun card(onClick: (() -> Unit)? = null): LinearLayout = tonalCard(R.color.card, onClick)
 
-    fun card(onClick: (() -> Unit)? = null): LinearLayout = column().apply {
-        background = ctx.getDrawable(R.drawable.card_bg)
-        val p = ctx.dp(16)
-        setPadding(p, p, p, p)
+    fun tonalCard(bgRes: Int, onClick: (() -> Unit)? = null, radiusDp: Int = CARD_RADIUS): LinearLayout = column().apply {
+        val bg = ctx.rounded(bgRes, radiusDp)
+        background = if (onClick != null) ctx.ripple(bg, radiusDp) else bg
+        val p = ctx.dp(20)
+        setPadding(p, ctx.dp(18), p, ctx.dp(18))
         marginTop(ctx.dp(12))
         if (onClick != null) {
             isClickable = true
             isFocusable = true
-            foreground = selectable()
             setOnClickListener { onClick() }
         }
     }
@@ -88,38 +107,90 @@ class Ui(val ctx: Context) {
         text = s
         setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
         setTextColor(color(colorRes))
-        if (bold) setTypeface(typeface, Typeface.BOLD)
-        setLineSpacing(0f, 1.1f)
+        typeface = if (bold) (if (sizeSp >= 20f) Typeface.DEFAULT_BOLD else MEDIUM) else Typeface.DEFAULT
+        setLineSpacing(0f, 1.15f)
         layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
     }
 
-    fun title(s: CharSequence) = text(s, 16f, R.color.text_primary, true)
+    fun title(s: CharSequence) = text(s, 17f, R.color.text_primary, true)
     fun primary(s: CharSequence) = text(s, 15f, R.color.text_primary)
-    fun small(s: CharSequence) = text(s, 13f)
-    fun big(s: CharSequence, colorRes: Int = R.color.text_primary) = text(s, 30f, colorRes, true)
+    fun small(s: CharSequence) = text(s, 13.5f)
+    fun big(s: CharSequence, colorRes: Int = R.color.text_primary) = text(s, 32f, colorRes, true)
 
-    fun section(s: String) = text(s.uppercase(Locale.getDefault()), 12f, R.color.text_secondary, true).marginTop(ctx.dp(20))
+    /** Section header: sentence case, primary colour (Material 3 style). */
+    fun section(s: String) = text(s, 15f, R.color.accent, true).apply {
+        setPadding(ctx.dp(4), 0, 0, 0)
+    }.marginTop(ctx.dp(28))
 
-    fun button(label: String, onClick: () -> Unit): Button = Button(ctx).apply {
+    /** Pill-shaped button. Primary = filled, otherwise tonal. */
+    fun button(label: String, filled: Boolean = true, onClick: () -> Unit): Button = Button(ctx, null, 0).apply {
         text = label
         isAllCaps = false
+        typeface = MEDIUM
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 15.5f)
+        stateListAnimator = null
+        gravity = Gravity.CENTER
+        minHeight = ctx.dp(52)
+        minimumHeight = ctx.dp(52)
+        setPadding(ctx.dp(24), 0, ctx.dp(24), 0)
+        val bg = ctx.rounded(if (filled) R.color.accent else R.color.accent_container, 100)
+        background = ctx.ripple(bg, 100)
+        setTextColor(color(if (filled) R.color.on_accent else R.color.on_accent_container))
+        layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ctx.dp(12) }
         setOnClickListener { onClick() }
     }
 
-    fun flatButton(label: String, onClick: () -> Unit): Button =
-        Button(ctx, null, android.R.attr.borderlessButtonStyle).apply {
-            text = label
-            isAllCaps = false
-            setTextColor(color(R.color.accent))
-            setOnClickListener { onClick() }
-        }
+    fun tonalButton(label: String, onClick: () -> Unit) = button(label, filled = false, onClick = onClick)
+
+    /** Text button: no container, primary colour. */
+    fun flatButton(label: String, onClick: () -> Unit): Button = Button(ctx, null, 0).apply {
+        text = label
+        isAllCaps = false
+        typeface = MEDIUM
+        stateListAnimator = null
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 14.5f)
+        setTextColor(color(R.color.accent))
+        minHeight = ctx.dp(48)
+        minimumHeight = ctx.dp(48)
+        minWidth = 0
+        minimumWidth = 0
+        setPadding(ctx.dp(14), 0, ctx.dp(14), 0)
+        background = ctx.ripple(null, 100)
+        setOnClickListener { onClick() }
+    }
+
+    /** Small rounded label, e.g. a status chip. */
+    fun chip(s: String, bgRes: Int = R.color.accent, fgRes: Int = R.color.on_accent): TextView = TextView(ctx).apply {
+        text = s
+        typeface = MEDIUM
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+        setTextColor(color(fgRes))
+        background = ctx.rounded(bgRes, 100)
+        setPadding(ctx.dp(12), ctx.dp(6), ctx.dp(12), ctx.dp(6))
+        layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = ctx.dp(10) }
+    }
+
+    /** Vector icon inside a tinted rounded square ("squircle"). */
+    fun iconBadge(iconRes: Int, bgRes: Int, fgRes: Int, sizeDp: Int = 48): ImageView = ImageView(ctx).apply {
+        setImageResource(iconRes)
+        imageTintList = ColorStateList.valueOf(color(fgRes))
+        background = ctx.rounded(bgRes, sizeDp * 3 / 10)
+        val p = ctx.dp(sizeDp / 4)
+        setPadding(p, p, p, p)
+        contentDescription = null
+        layoutParams = LinearLayout.LayoutParams(ctx.dp(sizeDp), ctx.dp(sizeDp))
+    }
 
     fun progress(percent: Int, colorRes: Int = R.color.accent): ProgressBar =
         ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 100
+            val track = ctx.rounded(R.color.card_high, 100)
+            val fill = ClipDrawable(ctx.rounded(colorRes, 100), Gravity.START, ClipDrawable.HORIZONTAL)
+            progressDrawable = LayerDrawable(arrayOf(track, fill)).apply {
+                setId(0, android.R.id.background); setId(1, android.R.id.progress)
+            }
             progress = percent.coerceIn(0, 100)
-            progressTintList = ColorStateList.valueOf(color(colorRes))
-            layoutParams = LinearLayout.LayoutParams(MATCH, ctx.dp(8)).apply { topMargin = ctx.dp(8) }
+            layoutParams = LinearLayout.LayoutParams(MATCH, ctx.dp(10)).apply { topMargin = ctx.dp(10) }
         }
 
     fun input(hint: String, value: String = "", type: Int = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES): EditText =
@@ -128,7 +199,11 @@ class Ui(val ctx: Context) {
             setText(value)
             inputType = type
             setTextColor(color(R.color.text_primary))
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
+            setHintTextColor(color(R.color.text_secondary))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            background = ctx.rounded(R.color.card_high, 16)
+            setPadding(ctx.dp(16), ctx.dp(14), ctx.dp(16), ctx.dp(14))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ctx.dp(10) }
         }
 
     fun numberInput(hint: String, value: String = "") =
@@ -143,20 +218,34 @@ class Ui(val ctx: Context) {
             gravity = Gravity.TOP or Gravity.START
         }
 
-    fun label(s: String) = small(s).marginTop(ctx.dp(10))
+    fun label(s: String) = text(s, 13.5f, R.color.text_secondary, true).marginTop(ctx.dp(16))
 
     fun spinner(items: List<String>, selected: Int): Spinner = Spinner(ctx).apply {
         adapter = ArrayAdapter(ctx, android.R.layout.simple_spinner_dropdown_item, items)
         setSelection(selected.coerceIn(0, (items.size - 1).coerceAtLeast(0)))
-        layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
+        background = ctx.rounded(R.color.card_high, 16)
+        setPadding(ctx.dp(8), ctx.dp(6), ctx.dp(8), ctx.dp(6))
+        layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = ctx.dp(8) }
+    }
+
+    private fun pickerButton(): Button = Button(ctx, null, 0).apply {
+        isAllCaps = false
+        typeface = MEDIUM
+        stateListAnimator = null
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+        setTextColor(color(R.color.on_accent_container))
+        background = ctx.ripple(ctx.rounded(R.color.accent_container, 16), 16)
+        minHeight = ctx.dp(48)
+        minimumHeight = ctx.dp(48)
+        setPadding(ctx.dp(16), 0, ctx.dp(16), 0)
+        layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = ctx.dp(8); marginEnd = ctx.dp(8) }
     }
 
     /** Button that shows a time and opens a 24h picker. */
     fun timeField(initialMin: Int, onChange: (Int) -> Unit): Button {
         var current = initialMin
-        val b = Button(ctx, null, android.R.attr.borderlessButtonStyle)
+        val b = pickerButton()
         b.text = Schedule.hhmm(current)
-        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
         b.setOnClickListener {
             TimePickerDialog(ctx, { _, h, m ->
                 current = h * 60 + m
@@ -170,9 +259,8 @@ class Ui(val ctx: Context) {
     fun dateField(initial: LocalDate, onChange: (LocalDate) -> Unit): Button {
         var current = initial
         val fmt = DateTimeFormatter.ofPattern("EEE d MMM yyyy", Locale.getDefault())
-        val b = Button(ctx, null, android.R.attr.borderlessButtonStyle)
+        val b = pickerButton()
         b.text = current.format(fmt)
-        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
         b.setOnClickListener {
             DatePickerDialog(ctx, { _, y, m, d ->
                 current = LocalDate.of(y, m + 1, d)
@@ -242,6 +330,7 @@ class Ui(val ctx: Context) {
     }
 
     fun empty(message: String) = card().apply {
-        addView(text(message).apply { gravity = Gravity.CENTER })
+        setPadding(ctx.dp(24), ctx.dp(28), ctx.dp(24), ctx.dp(28))
+        addView(text(message, 14.5f).apply { gravity = Gravity.CENTER })
     }
 }

@@ -19,6 +19,9 @@ import com.ayomide.campuskit.system.Alarms
 import com.ayomide.campuskit.system.Notifier
 import com.ayomide.campuskit.ui.BaseScreen
 import com.ayomide.campuskit.ui.dp
+import com.ayomide.campuskit.ui.ripple
+import com.ayomide.campuskit.ui.rounded
+import com.ayomide.campuskit.ui.marginTop
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
@@ -41,7 +44,17 @@ class MainActivity : BaseScreen() {
             prefs.askedNotifications = true
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
         }
-        actions.addView(ui.flatButton("⚙") { open(SettingsActivity::class.java) }.apply { contentDescription = "Settings" })
+        actions.addView(android.widget.ImageView(this).apply {
+            setImageResource(R.drawable.ic_tune)
+            imageTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.text_primary))
+            contentDescription = "Settings"
+            val p = dp(12)
+            setPadding(p, p, p, p)
+            background = ripple(rounded(R.color.card, 100), 100)
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+            isClickable = true
+            setOnClickListener { open(SettingsActivity::class.java) }
+        })
     }
 
     override fun onResume() {
@@ -63,38 +76,51 @@ class MainActivity : BaseScreen() {
         val now = System.currentTimeMillis()
         val today = LocalDate.now(zone)
 
-        val hour = LocalTime.now(zone).hour
-        val hello = when (hour) {
+        val hello = when (LocalTime.now(zone).hour) {
             in 0..11 -> "Good morning"
             in 12..16 -> "Good afternoon"
             else -> "Good evening"
         }
-        add(ui.small("$hello 👋 · " + today.format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.getDefault()))))
+        add(ui.text("$hello 👋", 24f, R.color.text_primary, true).apply { setPadding(dp(4), 0, 0, 0) })
+        add(ui.small(today.format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault()))).apply { setPadding(dp(4), dp(2), 0, 0) })
 
-        // Next class
+        // Hero: next class
         val classes = db.classes()
         val next = Schedule.currentOrNext(classes, now, zone)
-        add(ui.card { open(TimetableActivity::class.java) }.apply {
-            addView(ui.small("NEXT CLASS"))
+        add(ui.tonalCard(R.color.accent_container, { open(TimetableActivity::class.java) }, radiusDp = 28).apply {
+            setPadding(dp(22), dp(22), dp(22), dp(22))
+            marginTop(dp(16))
+            addView(ui.row().apply {
+                addView(ui.iconBadge(R.drawable.ic_calendar, R.color.accent, R.color.on_accent, 40))
+                addView(ui.text("Next class", 14f, R.color.on_accent_container, true).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(12) }
+                })
+            })
             if (next == null) {
-                addView(ui.title("No classes yet"))
-                addView(ui.small("Tap to add your timetable and get reminders before each lecture."))
+                addView(ui.text("No classes yet", 26f, R.color.on_accent_container, true).marginTop(dp(14)))
+                addView(ui.text("Add your timetable to get a reminder before every lecture.", 14.5f, R.color.on_accent_container))
+                addView(ui.chip("Add timetable"))
             } else {
                 val s = next.slot
-                addView(ui.big(s.code).apply { textSize = 26f })
+                addView(ui.text(s.code, 34f, R.color.on_accent_container, true).marginTop(dp(12)))
                 val where = if (s.venue.isNotBlank()) " · ${s.venue}" else ""
                 val day = if (Schedule.epochDay(next.startMillis, zone) == today.toEpochDay()) "Today" else Schedule.DAY_NAMES[s.day - 1]
-                addView(ui.primary("$day ${Schedule.range(s)}$where"))
-                val status = if (now >= next.startMillis) "Ongoing, ends ${Schedule.clock(next.endMillis, zone)}"
-                else "Starts " + Countdown.until(next.startMillis - now)
-                addView(ui.text(status, 14f, R.color.accent, true))
+                addView(ui.text("$day ${Schedule.range(s)}$where", 15f, R.color.on_accent_container))
+                addView(ui.chip(if (now >= next.startMillis) "Ongoing · ends ${Schedule.clock(next.endMillis, zone)}"
+                    else "Starts " + Countdown.until(next.startMillis - now)))
             }
         })
 
-        // Stats
+        // Warnings
+        if (!Notifier.canPost(this)) {
+            add(warning("Notifications are off", "You won't get lecture, exam or timer reminders. Tap to fix."))
+        } else if (!Alarms.canExact(this) && classes.isNotEmpty()) {
+            add(warning("Reminders may be late", "Allow \"Alarms & reminders\" for on-time reminders. Tap to fix."))
+        }
+
+        // Bento stats
         val exam = db.exams().firstOrNull { it.atMillis > now }
-        val days = db.sessions().map { Schedule.epochDay(it.endMillis, zone) }
-        val streak = Streak.current(days, today.toEpochDay())
+        val streak = Streak.current(db.sessions().map { Schedule.epochDay(it.endMillis, zone) }, today.toEpochDay())
         val month = YearMonth.now(zone)
         val from = month.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
         val to = month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
@@ -102,77 +128,100 @@ class MainActivity : BaseScreen() {
         val allowance = prefs.allowanceKobo
         val due = db.dueCount(null, today.toEpochDay())
 
-        statRow(
-            Stat("NEXT EXAM", exam?.course ?: "None", exam?.let { Countdown.until(it.atMillis - now) } ?: "Add exams", ExamsActivity::class.java),
-            Stat("STUDY STREAK", "🔥 $streak", if (streak == 1) "day" else "days", StudyActivity::class.java),
+        add(ui.section("At a glance"))
+        pair(
+            Stat(R.drawable.ic_edit, R.color.t_rose, R.color.on_t_rose, "Next exam", exam?.course ?: "None",
+                exam?.let { Countdown.until(it.atMillis - now) } ?: "Add your exams", ExamsActivity::class.java),
+            Stat(R.drawable.ic_timer, R.color.t_amber, R.color.on_t_amber, "Study streak", "🔥 $streak",
+                if (streak == 1) "day" else "days", StudyActivity::class.java),
         )
-        statRow(
-            Stat(
-                "BUDGET LEFT",
-                if (allowance > 0) Money.format(allowance - spent) else Money.format(spent),
-                if (allowance > 0) "this month" else "spent this month",
-                BudgetActivity::class.java,
-            ),
-            Stat("CARDS DUE", "$due", "flashcards", DecksActivity::class.java),
+        pair(
+            Stat(R.drawable.ic_wallet, R.color.t_green, R.color.on_t_green,
+                if (allowance > 0) "Budget left" else "Spent", Money.format(if (allowance > 0) allowance - spent else spent),
+                "this month", BudgetActivity::class.java),
+            Stat(R.drawable.ic_layers, R.color.t_violet, R.color.on_t_violet, "Cards due", "$due",
+                "flashcards", DecksActivity::class.java),
         )
-
-        // Warnings
-        if (!Notifier.canPost(this)) {
-            add(ui.card { open(SettingsActivity::class.java) }.apply {
-                addView(ui.text("Notifications are off", 15f, R.color.danger, true))
-                addView(ui.small("You won't get lecture, exam or timer reminders. Tap to fix in Settings."))
-            })
-        } else if (!Alarms.canExact(this) && classes.isNotEmpty()) {
-            add(ui.card { open(SettingsActivity::class.java) }.apply {
-                addView(ui.text("Reminders may be a few minutes late", 15f, R.color.warning, true))
-                addView(ui.small("Allow \"Alarms & reminders\" for on-time reminders. Tap to open Settings."))
-            })
-        }
 
         // Tools
         add(ui.section("Tools"))
-        toolRow(Tool("🗓", "Timetable", TimetableActivity::class.java), Tool("🎓", "GPA / CGPA", GpaActivity::class.java))
-        toolRow(Tool("✅", "Attendance", AttendanceActivity::class.java), Tool("⏱", "Study timer", StudyActivity::class.java))
-        toolRow(Tool("📝", "Exams", ExamsActivity::class.java), Tool("💸", "Budget", BudgetActivity::class.java))
-        toolRow(Tool("🧠", "Flashcards", DecksActivity::class.java), Tool("⚙", "Settings", SettingsActivity::class.java))
+        val tools = listOf(
+            Tool(R.drawable.ic_calendar, R.color.t_blue, R.color.on_t_blue, "Timetable", "Lectures & reminders", TimetableActivity::class.java),
+            Tool(R.drawable.ic_school, R.color.t_violet, R.color.on_t_violet, "GPA / CGPA", "Results & targets", GpaActivity::class.java),
+            Tool(R.drawable.ic_check, R.color.t_green, R.color.on_t_green, "Attendance", "Classes you can miss", AttendanceActivity::class.java),
+            Tool(R.drawable.ic_timer, R.color.t_amber, R.color.on_t_amber, "Study timer", "Focus sessions", StudyActivity::class.java),
+            Tool(R.drawable.ic_edit, R.color.t_rose, R.color.on_t_rose, "Exams", "Countdowns", ExamsActivity::class.java),
+            Tool(R.drawable.ic_wallet, R.color.t_teal, R.color.on_t_teal, "Budget", "Allowance & spending", BudgetActivity::class.java),
+            Tool(R.drawable.ic_layers, R.color.t_orange, R.color.on_t_orange, "Flashcards", "Spaced revision", DecksActivity::class.java),
+            Tool(R.drawable.ic_tune, R.color.t_slate, R.color.on_t_slate, "Settings", "Reminders & grading", SettingsActivity::class.java),
+        )
+        for (i in tools.indices step 2) {
+            val row = ui.row().apply {
+                gravity = Gravity.TOP
+                marginTop(dp(12))
+            }
+            for (j in 0..1) {
+                val t = tools[i + j]
+                row.addView(ui.card { open(t.target) }.apply {
+                    layoutParams = half(j == 0)
+                    minimumHeight = dp(132)
+                    addView(ui.iconBadge(t.icon, t.bg, t.fg, 48))
+                    addView(ui.text(t.name, 16f, R.color.text_primary, true).marginTop(dp(14)))
+                    addView(ui.small(t.blurb))
+                })
+            }
+            add(row)
+        }
 
         add(ui.small("Everything stays on your phone. No account, no internet.").apply {
             gravity = Gravity.CENTER
-            setPadding(0, dp(24), 0, 0)
+            setPadding(0, dp(28), 0, 0)
         })
     }
 
-    private class Stat(val label: String, val value: String, val sub: String, val target: Class<*>)
-    private class Tool(val icon: String, val name: String, val target: Class<*>)
+    private class Stat(val icon: Int, val bg: Int, val fg: Int, val label: String, val value: String, val sub: String, val target: Class<*>)
+    private class Tool(val icon: Int, val bg: Int, val fg: Int, val name: String, val blurb: String, val target: Class<*>)
 
-    private fun halfParams(first: Boolean) = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f).apply {
-        topMargin = dp(12)
+    /** Half-width cell in a 2-column row. No top margin: the row carries the spacing. */
+    private fun half(first: Boolean) = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
         if (first) marginEnd = dp(6) else marginStart = dp(6)
     }
 
-    private fun statRow(a: Stat, b: Stat) {
-        val row = ui.row().apply { gravity = Gravity.FILL_VERTICAL }
+    private fun pair(a: Stat, b: Stat) {
+        val row = ui.row().apply { gravity = Gravity.TOP; marginTop(dp(12)) }
         for ((i, s) in listOf(a, b).withIndex()) {
-            row.addView(ui.card { open(s.target) }.apply {
-                layoutParams = halfParams(i == 0)
-                addView(ui.text(s.label, 11f, R.color.text_secondary, true))
-                addView(ui.text(s.value, 20f, R.color.text_primary, true).apply { maxLines = 1 })
-                addView(ui.small(s.sub))
+            row.addView(ui.tonalCard(s.bg, { open(s.target) }).apply {
+                layoutParams = half(i == 0)
+                minimumHeight = dp(140)
+                addView(ui.row().apply {
+                    addView(android.widget.ImageView(this@MainActivity).apply {
+                        setImageResource(s.icon)
+                        imageTintList = android.content.res.ColorStateList.valueOf(getColor(s.fg))
+                        layoutParams = LinearLayout.LayoutParams(dp(20), dp(20))
+                    })
+                    addView(ui.text(s.label, 13.5f, s.fg, true).apply {
+                        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(8) }
+                    })
+                })
+                addView(ui.text(s.value, 24f, s.fg, true).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }.marginTop(dp(14)))
+                addView(ui.text(s.sub, 13.5f, s.fg))
             })
         }
         add(row)
     }
 
-    private fun toolRow(a: Tool, b: Tool) {
-        val row = ui.row()
-        for ((i, t) in listOf(a, b).withIndex()) {
-            row.addView(ui.card { open(t.target) }.apply {
-                layoutParams = halfParams(i == 0)
-                gravity = Gravity.CENTER
-                addView(ui.text(t.icon, 28f).apply { gravity = Gravity.CENTER })
-                addView(ui.text(t.name, 15f, R.color.text_primary, true).apply { gravity = Gravity.CENTER })
+    private fun warning(title: String, body: String) =
+        ui.tonalCard(R.color.danger_container, { open(SettingsActivity::class.java) }).apply {
+            addView(ui.row().apply {
+                addView(android.widget.ImageView(this@MainActivity).apply {
+                    setImageResource(R.drawable.ic_warning)
+                    imageTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.danger))
+                    layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
+                })
+                addView(ui.text(title, 15f, R.color.danger, true).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(10) }
+                })
             })
+            addView(ui.small(body).marginTop(dp(6)))
         }
-        add(row)
-    }
 }

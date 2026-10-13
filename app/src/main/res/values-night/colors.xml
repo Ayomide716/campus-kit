@@ -1,12 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg">#FF0E1015</color>
-    <color name="card">#FF181B22</color>
-    <color name="divider">#FF2A2E37</color>
-    <color name="text_primary">#FFF2F4F7</color>
-    <color name="text_secondary">#FFA0A8B5</color>
-    <color name="accent">#FF8B85FF</color>
-    <color name="success">#FF4ADE80</color>
-    <color name="danger">#FFF87171</color>
+    <color name="bg">#FF121318</color>
+    <color name="card">#FF1E1F26</color>
+    <color name="card_high">#FF292A31</color>
+    <color name="divider">#FF34353D</color>
+    <color name="text_primary">#FFE4E1EC</color>
+    <color name="text_secondary">#FFA9A7B8</color>
+    <color name="accent">#FFC1C1FF</color>
+    <color name="on_accent">#FF1D1C7A</color>
+    <color name="accent_container">#FF3A39A8</color>
+    <color name="on_accent_container">#FFE1E0FF</color>
+    <color name="success">#FF6EE7A0</color>
+    <color name="danger">#FFFFB4AB</color>
+    <color name="danger_container">#FF5C1A15</color>
     <color name="warning">#FFFBBF24</color>
+
+    <color name="t_blue">#FF1F3A6B</color>      <color name="on_t_blue">#FFD6E3FF</color>
+    <color name="t_violet">#FF3E2C6B</color>    <color name="on_t_violet">#FFEADDFF</color>
+    <color name="t_green">#FF1B4430</color>     <color name="on_t_green">#FFBDF0CF</color>
+    <color name="t_orange">#FF5A2E12</color>    <color name="on_t_orange">#FFFFDBC8</color>
+    <color name="t_rose">#FF5C1F33</color>      <color name="on_t_rose">#FFFFD9E2</color>
+    <color name="t_teal">#FF12433F</color>      <color name="on_t_teal">#FFBFEFE9</color>
+    <color name="t_amber">#FF4D3A08</color>     <color name="on_t_amber">#FFFFE08A</color>
+    <color name="t_slate">#FF33363F</color>     <color name="on_t_slate">#FFDDE1EC</color>
 </resources>

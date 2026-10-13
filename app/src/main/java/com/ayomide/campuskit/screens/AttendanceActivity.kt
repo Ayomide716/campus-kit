@@ -14,10 +14,8 @@ class AttendanceActivity : BaseScreen() {
     override fun render() {
         val db = Db.get(this)
         val list = db.attendance()
-        add(ui.row().apply {
-            addView(ui.button("+ Add course") { edit(null) })
-            addView(ui.flatButton("Import from timetable") { importFromTimetable() })
-        })
+        add(ui.button("+ Add course") { edit(null) })
+        add(ui.flatButton("Import courses from timetable") { importFromTimetable() })
         if (list.isEmpty()) {
             add(ui.empty("Track each course: tap ✓ when you attend and ✗ when you miss. You'll see how many more classes you can miss and still meet the requirement (usually 75%)."))
             return

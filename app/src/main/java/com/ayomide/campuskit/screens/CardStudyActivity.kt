@@ -55,11 +55,15 @@ class CardStudyActivity : BaseScreen() {
         })
         if (showBackSide) {
             add(ui.row().apply {
-                addView(ui.button("✗ Again") { answer(card, false) }.apply {
-                    layoutParams = android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                addView(ui.tonalButton("✗ Again") { answer(card, false) }.apply {
+                    layoutParams = android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                        topMargin = dp(12); marginEnd = dp(6)
+                    }
                 })
                 addView(ui.button("✓ Got it") { answer(card, true) }.apply {
-                    layoutParams = android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                    layoutParams = android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                        topMargin = dp(12); marginStart = dp(6)
+                    }
                 })
             })
         }

@@ -4,7 +4,6 @@ import android.app.Activity
 import android.os.Build
 import android.os.Bundle
 import android.util.TypedValue
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -38,31 +37,29 @@ abstract class BaseScreen : Activity() {
         }
 
         val bar = ui.row().apply {
-            setPadding(dp(8), dp(8), dp(8), dp(4))
-            minimumHeight = dp(56)
+            setPadding(dp(4), dp(12), dp(8), dp(8))
+            minimumHeight = dp(64)
         }
         if (showBack) {
-            bar.addView(TextView(this).apply {
-                text = "←"
+            bar.addView(android.widget.ImageView(this).apply {
+                setImageResource(R.drawable.ic_back)
+                imageTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.text_primary))
                 contentDescription = "Back"
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
-                setTextColor(getColor(R.color.text_primary))
-                gravity = Gravity.CENTER
-                layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+                val p = dp(12)
+                setPadding(p, p, p, p)
+                background = ripple(rounded(R.color.card, 100), 100)
+                layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(8); marginEnd = dp(4) }
                 isClickable = true
                 isFocusable = true
-                val a = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackgroundBorderless))
-                background = a.getDrawable(0)
-                a.recycle()
                 setOnClickListener { finish() }
             })
         }
         bar.addView(TextView(this).apply {
             text = screenTitle
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, if (showBack) 22f else 28f)
             setTextColor(getColor(R.color.text_primary))
             setTypeface(typeface, android.graphics.Typeface.BOLD)
-            setPadding(if (showBack) dp(4) else dp(8), 0, 0, 0)
+            setPadding(if (showBack) dp(8) else dp(12), 0, 0, 0)
         }.weight(1f))
         actions = ui.row().apply { layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT) }
         bar.addView(actions)
