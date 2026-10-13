@@ -8,8 +8,8 @@ object Leitner {
 
     const val MAX_BOX = 5
 
-    /** Days until next review after reaching box index (1..5). */
-    private val INTERVAL_DAYS = intArrayOf(0, 1, 2, 4, 7, 14)
+    /** Days until next review after moving up to box index (2..5): 1, 3, 7, 14. */
+    private val INTERVAL_DAYS = intArrayOf(0, 0, 1, 3, 7, 14)
 
     data class Next(val box: Int, val dueDay: Long)
 
